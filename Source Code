@@ -1,0 +1,249 @@
+// Initialize constants and variables 
+const numVehicles = 4; // Number of vehicles to be generated
+const gridMatrix = []; // 2D array for storing each cell of the grid
+const vehicleColors = ['orange', 'purple', 'cyan', 'pink']; // New colors for vehicles
+const pathColors = ['#FFA500', '#800080', '#00FFFF', '#FFC0CB']; // Colors for each vehicle's path
+const vehicleArray = []; // Array to store all vehicle objects
+let numCols, numRows; // Number of columns and rows in the grid
+let cellSize; // Size of each square cell
+const roadColor = '#2F2F2F'; // Grey color for road (non-barrier) cells
+const barrierColor = '#D2B48C'; // Tan for barrier (obstacle) cells
+const outlineColor = '#333333'; // Light black outline color
+const carIcons = ['🚐', '🚍', '🚜', '🛻']; // Icons for vehicles
+let moveCounter = 0; // Controls the sequential movement of vehicles
+
+// Cell class to represent each cell in the grid
+class Cell {
+  constructor(i, j) {
+    this.i = i; // Column index of cell
+    this.j = j; // Row index of cell
+    this.isBarrier = random(1) < 0.2; // Randomly assign some cells as barriers
+    this.gScore = Infinity; // Distance from start cell in pathfinding
+    this.hScore = 0; // Heuristic distance to end cell
+    this.fScore = 0; // Combined cost for A* algorithm (gScore + hScore)
+    this.neighbors = []; // Array to hold neighboring cells
+    this.previous = undefined; // Tracks the cell's predecessor for path reconstruction
+  }
+
+  // Display the cell as either a road or a barrier on the canvas with outline
+  show() {
+    stroke(outlineColor); // Set outline color
+    strokeWeight(1); // Outline thickness
+    fill(this.isBarrier ? barrierColor : roadColor); // Set color based on barrier status
+    rect(this.i * cellSize, this.j * cellSize, cellSize, cellSize); // Draw cell as square block
+  }
+
+  // Add adjacent (neighboring) cells for pathfinding
+  addAdjacent(grid) {
+    const { i, j } = this;
+    if (i < numCols - 1) this.neighbors.push(grid[i + 1][j]); // Right neighbor
+    if (i > 0) this.neighbors.push(grid[i - 1][j]); // Left neighbor
+    if (j < numRows - 1) this.neighbors.push(grid[i][j + 1]); // Bottom neighbor
+    if (j > 0) this.neighbors.push(grid[i][j - 1]); // Top neighbor
+  }
+}
+
+// Vehicle class to represent each moving vehicle
+class Vehicle {
+  constructor(startCell, endCell, color, icon, pathColor) {
+    this.startCell = startCell; // Starting cell of the vehicle
+    this.endCell = endCell; // Destination cell of the vehicle
+    this.color = color; // Color associated with the vehicle
+    this.icon = icon; // Icon representing the vehicle
+    this.pathColor = pathColor; // Path color specific to this vehicle
+    this.path = []; // Path calculated from start to end
+    this.currentCell = startCell; // Current cell position of the vehicle
+    this.calculatePath(); // Calculate the initial path
+  }
+
+  // Reset pathfinding scores for each cell before recalculating a path
+  resetScores() {
+    for (let i = 0; i < numCols; i++) {
+      for (let j = 0; j < numRows; j++) {
+        let cell = gridMatrix[i][j];
+        cell.gScore = Infinity; // Reset gScore to max for each cell
+        cell.hScore = 0; // Reset hScore
+        cell.fScore = 0; // Reset fScore
+        cell.previous = undefined; // Clear previous path reference
+      }
+    }
+  }
+
+  // Calculate path from start to end cell using A* algorithm
+  calculatePath() {
+    this.resetScores(); // Reset scores for a fresh path calculation
+    let openSet = [this.startCell]; // Open set contains cells to evaluate
+    this.path = [];
+    this.startCell.gScore = 0; // Set gScore of the start cell to 0
+
+    // Main loop for pathfinding with A* algorithm
+    while (openSet.length > 0) {
+      // Find the cell in openSet with the lowest fScore
+      let lowestIndex = 0;
+      for (let i = 1; i < openSet.length; i++) {
+        if (openSet[i].fScore < openSet[lowestIndex].fScore) {
+          lowestIndex = i;
+        }
+      }
+      let currentCell = openSet[lowestIndex];
+
+      // If end cell is reached, reconstruct the path
+      if (currentCell === this.endCell) {
+        let temp = currentCell;
+        while (temp) {
+          this.path.push(temp);
+          temp = temp.previous;
+        }
+        this.path.reverse(); // Reverse path to go from start to end
+        return;
+      }
+
+      // Remove current cell from openSet
+      openSet.splice(lowestIndex, 1);
+
+      // Check each neighbor of the current cell
+      currentCell.neighbors.forEach(neighbor => {
+        if (neighbor.isBarrier) return; // Skip barriers
+
+        let tempG = currentCell.gScore + 1;
+        if (tempG < neighbor.gScore) {
+          neighbor.gScore = tempG;
+          neighbor.hScore = this.heuristic(neighbor, this.endCell);
+          neighbor.fScore = neighbor.gScore + neighbor.hScore;
+          neighbor.previous = currentCell;
+
+          if (!openSet.includes(neighbor)) {
+            openSet.push(neighbor);
+          }
+        }
+      });
+    }
+  }
+
+  // Heuristic function for A* (Manhattan distance)
+  heuristic(a, b) {
+    return abs(a.i - b.i) + abs(a.j - b.j);
+  }
+
+  // Move the vehicle to the next position in its path
+  move() {
+    if (this.path.length > 1) {
+      this.currentCell = this.path[1];
+      this.path.shift();
+    }
+  }
+
+  // Draw the path for the vehicle as a line on the canvas with unique color
+  drawPath() {
+    noFill();
+    stroke(this.pathColor);
+    strokeWeight(1.5);
+    beginShape();
+    this.path.forEach(cell => {
+      vertex(
+        cell.i * cellSize + cellSize / 2,
+        cell.j * cellSize + cellSize / 2
+      );
+    });
+    endShape();
+  }
+
+  // Display the vehicle and its destination on the canvas
+  show() {
+    // Mark the destination with a trophy emoji
+    textSize(cellSize * 0.8);
+    textAlign(CENTER, CENTER);
+    text("🏁", this.endCell.i * cellSize + cellSize / 2, this.endCell.j * cellSize + cellSize / 2);
+
+    // Display the vehicle's current position with an icon
+    textSize(cellSize * 0.8);
+    textAlign(CENTER, CENTER);
+    text(
+      this.icon,
+      this.currentCell.i * cellSize + cellSize / 2,
+      this.currentCell.j * cellSize + cellSize / 2
+    );
+  }
+}
+
+// Setup function to initialize the grid and vehicles
+function setup() {
+   createCanvas(900, 700); // Create a canvas of specified size
+
+  // Calculate number of columns and rows based on canvas size
+  numCols = floor(width / 30);
+  numRows = floor(height / 30);
+  cellSize = min(width / numCols, height / numRows); // Square cell size
+
+  // Initialize grid with Cell objects
+  for (let i = 0; i < numCols; i++) {
+    gridMatrix[i] = [];
+    for (let j = 0; j < numRows; j++) {
+      gridMatrix[i][j] = new Cell(i, j);
+    }
+  }
+
+  // Add neighbors for each cell in the grid
+  for (let i = 0; i < numCols; i++) {
+    for (let j = 0; j < numRows; j++) {
+      gridMatrix[i][j].addAdjacent(gridMatrix);
+    }
+  }
+
+  // Create vehicle objects with start and end positions
+  for (let i = 0; i < numVehicles; i++) {
+    let startCell, endCell;
+    // Select random non-barrier cells for starting position
+    do {
+      startCell = gridMatrix[floor(random(numCols))][floor(random(numRows))];
+    } while (startCell.isBarrier);
+
+    // Select random non-barrier cells for destination position
+    do {
+      endCell = gridMatrix[floor(random(numCols))][floor(random(numRows))];
+    } while (endCell.isBarrier || endCell === startCell);
+
+    // Ensure start and end cells are not barriers
+    startCell.isBarrier = false;
+    endCell.isBarrier = false;
+    let color = vehicleColors[i % vehicleColors.length];
+    let icon = carIcons[i % carIcons.length];
+    let pathColor = pathColors[i % pathColors.length];
+    vehicleArray.push(new Vehicle(startCell, endCell, color, icon, pathColor));
+  }
+
+  frameRate(5); // Set frame rate here
+}
+
+// Draw function to update and render the simulation
+function draw() {
+  background(roadColor); // Clear canvas with background color
+
+  // Display each cell on the canvas
+  for (let i = 0; i < numCols; i++) {
+    for (let j = 0; j < numRows; j++) {
+      gridMatrix[i][j].show();
+    }
+  }
+
+  // Move each vehicle sequentially, one step at a time
+  let vehicleIndex = moveCounter % numVehicles;
+  vehicleArray[vehicleIndex].move();
+
+  // Draw paths and vehicles
+  vehicleArray.forEach(vehicle => {
+    vehicle.drawPath();
+    vehicle.show();
+  });
+
+  moveCounter++; // Increment to control which vehicle moves next
+}
+
+
+/* References:
+[1] https://youtu.be/aKYlikFAV4k
+[2] https://www.youtube.com/watch?v=EaZxUCWAjb0
+[3] https://www.youtube.com/watch?v=jwRT4PCT6RU
+[4] https://github.com/akshatk16/A-star-Path-Finder
+[5] https://github.com/arizakevin/a-star-algorithm
+*/
