@@ -1,5 +1,6 @@
 # -Autonomous-Car-Simulation-using-JavaScript
-Developed a 2D traffic simulation using A* pathfinding for dynamic route optimization. Impact: Demonstrated efficient route planning and decision-making in autonomous systems under dynamic conditions./n
+Developed a 2D traffic simulation using A* pathfinding for dynamic route optimization. Impact: Demonstrated efficient route planning and decision-making in autonomous systems under dynamic conditions.
+
 **1.INTRODUCTION**
 
 This project involves simulating a 2D traffic world with autonomous vehicles using the A* pathfinding algorithm. The goal is to model a set of vehicles moving on a grid-based street layout while avoiding obstacles (other cars). The vehicles calculate and adjust their paths dynamically in response to their environment. The project leverages the p5.js library for visualization and interaction.
